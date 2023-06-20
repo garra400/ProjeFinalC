@@ -19,7 +19,7 @@ git clone https://github.com/pedrojosawczuk/EcommerceLojaRoupas.git
 Entre na pasta com o repositório local
 
 ```
-cd EcommerceLojaRoupas
+cd TrabalhoFinal
 ```
 
 Para compilar e executar o código utilize o seguinte comando
