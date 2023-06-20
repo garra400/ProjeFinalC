@@ -1,0 +1,176 @@
+public static Tarefa? SelecionarTarefa(Usuario Usuario, ProjetoDbContext db)
+        {
+            Console.WriteLine();
+            Console.Write("Digite o ID da Tarefa: ");
+            string? idTarefa = Console.ReadLine();
+            if (idTarefa == null)
+            {
+                Console.WriteLine("ID inválido.");
+                return null;
+            }
+
+            if (!int.TryParse(idTarefa, out int TarefaId))
+            {
+                Console.WriteLine("ID inválido.");
+                return null;
+            }
+
+            var Tarefa = db.Tarefas?
+                .Include(t => t.TarefasUsuarios)
+                .FirstOrDefault(t => t.TarefaId == TarefaId &&
+                    (t.Projeto.UsuarioResponsavelId == Usuario.UsuarioId ||
+                    t.TarefasUsuarios.Any(tu => tu.UsuarioId == Usuario.UsuarioId)));
+            if (Tarefa == null)
+            {
+                Console.WriteLine("Tarefa não encontrada.");
+                return null;
+            }
+
+            return Tarefa;
+        }
+
+        public static void AcessarTarefa(Usuario usuario, Tarefa tarefa, ProjetoDbContext db)
+        {
+            bool sair = false;
+
+            while (!sair)
+            {
+                Console.WriteLine($"== Projeto: {tarefa?.Projeto?.Nome} // Tarefa: {tarefa?.Nome} // Status: {tarefa?.Status} // Descrição: {tarefa?.Descricao} // Prioridade: {tarefa.Prioridade}==");
+                Console.WriteLine();
+                Console.WriteLine("1. Configurar Tarefa");
+                Console.WriteLine("2. Adicionar Pessoa à Tarefa");
+                Console.WriteLine("3. Apagar Tarefa");
+                Console.WriteLine("0. Voltar");
+                Console.WriteLine();
+                Console.Write("Opção: ");
+                string? opcaoTarefa = Console.ReadLine();
+
+                Console.Clear();
+
+                switch (opcaoTarefa)
+                {
+                    case "1":
+                        if (IsDonoProjeto(usuario, tarefa.Projeto) || IsGerenteOuSuperiorTarefa(usuario, tarefa, db))
+                        {
+                            ConfigurarTarefa(tarefa, db);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Você não tem permissão para configurar a Tarefa.");
+                        }
+                        break;
+                    case "2":
+                        if (IsDonoProjeto(usuario, tarefa.Projeto) || IsGerenteOuSuperiorTarefa(usuario, tarefa, db))
+                        {
+                            AdicionarPessoaATarefa(tarefa, db);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Você não tem permissão para adicionar pessoas à Tarefa.");
+                        }
+                        break;
+                    case "3":
+                        if (IsDonoProjeto(usuario, tarefa.Projeto) || IsGerenteOuSuperiorTarefa(usuario, tarefa, db))
+                        {
+                            ApagarTarefa(tarefa, db);
+                            sair = true; // Termina o loop após apagar a tarefa
+                        }
+                        else
+                        {
+                            Console.WriteLine("Você não tem permissão para apagar a Tarefa.");
+                        }
+                        break;
+                    case "0":
+                        sair = true;
+                        break;
+                    default:
+                        Console.WriteLine("Opção inválida.");
+                        continue;
+                }
+
+                Console.WriteLine();
+                Console.WriteLine("Pressione qualquer tecla para continuar...");
+                Console.ReadKey();
+            }
+        }
+
+        public static void ConfigurarTarefa(Tarefa tarefa, ProjetoDbContext db)
+        {
+            Console.WriteLine("Selecione o novo status da tarefa:");
+            Console.WriteLine("1. Pendente");
+            Console.WriteLine("2. Em Progresso");
+            Console.WriteLine("3. Concluída");
+            Console.WriteLine();
+            Console.Write("Opção: ");
+            string? opcaoStatus = Console.ReadLine();
+
+            switch (opcaoStatus)
+            {
+                case "1":
+                    tarefa.Status = "Pendente";
+                    break;
+                case "2":
+                    tarefa.Status = "Em Progresso";
+                    break;
+                case "3":
+                    tarefa.Status = "Concluída";
+                    break;
+                default:
+                    Console.WriteLine("Opção inválida.");
+                    return;
+            }
+
+            // Atualizar a tarefa no banco de dados
+            db.SaveChanges();
+
+            Console.WriteLine("Status da tarefa atualizado com sucesso.");
+        }
+
+       public static void AdicionarPessoaATarefa(Tarefa tarefa, ProjetoDbContext db)
+        {
+            Console.WriteLine("== Adicionar Pessoa à Tarefa ==");
+            Console.Write("Digite o email da pessoa a ser adicionada: ");
+            string? emailPessoa = Console.ReadLine();
+
+            if (string.IsNullOrEmpty(emailPessoa))
+            {
+                Console.WriteLine("Email não pode ser vazio!");
+                return;
+            }
+
+            var pessoa = db.Usuarios?.FirstOrDefault(u => u.Email == emailPessoa);
+
+            if (pessoa == null)
+            {
+                Console.WriteLine("Usuário não encontrado.");
+                return;
+            }
+
+            var tarefaUsuario = new TarefaUsuario
+            {
+                TarefaId = tarefa.TarefaId,
+                UsuarioId = pessoa.UsuarioId
+            };
+
+            db.TarefasUsuarios.Add(tarefaUsuario);
+            db.SaveChanges();
+
+            Console.WriteLine($"Pessoa '{pessoa.Nome}' adicionada à Tarefa '{tarefa.Nome}' com sucesso!");
+        }
+
+
+
+        public static void ApagarTarefa(Tarefa tarefa, ProjetoDbContext db)
+        {
+            // Remover a tarefa do banco de dados
+            db.Tarefas.Remove(tarefa);
+            db.SaveChanges();
+
+            Console.WriteLine("Tarefa apagada com sucesso.");
+        }
+
+
+        private static bool IsDonoProjeto(Usuario usuario, Projeto projeto)
+        {
+            return usuario.UsuarioId == projeto.UsuarioResponsavelId;
+        }
